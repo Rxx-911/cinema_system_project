@@ -11,9 +11,7 @@ public class SeatEntity {
     }
     public enum Status {
         AVAILABLE,
-        LOCKED,   // selected in an ongoing transaction
-        SOLD,
-        MAINTENANCE
+        LOCKED
     }
     
     @Id
