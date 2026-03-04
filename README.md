@@ -1,0 +1,36 @@
+# Cinema Booking System
+
+A cinema ticket booking system built with Flutter + Spring Boot + MySQL.
+
+## Project Structure
+
+cinema_system_project
+├── cinema_system      # Flutter Frontend
+└── cinema_backend     # Spring Boot Backend
+
+## Requirements
+
+- Flutter
+- Java JDK 17
+- Maven
+- MySQL
+
+## Run Backend
+
+cd cinema_backend  
+./mvnw spring-boot:run
+
+Server runs on:
+http://localhost:8080
+
+## Run Flutter
+
+cd cinema_system  
+flutter pub get  
+flutter run
+
+## Database
+
+MySQL database name:
+
+cinema
