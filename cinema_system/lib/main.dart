@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/movie_list_page.dart';
+import 'pages/login_page.dart';
+
 
 void main() {
   runApp(const CinemaApp());
@@ -62,7 +64,7 @@ class CinemaApp extends StatelessWidget {
       ),
 
       // ===== 唯一首页 =====
-      home: const MovieListPage(),
+      home: const LoginPage(),
     );
   }
 }
