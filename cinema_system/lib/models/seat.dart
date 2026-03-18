@@ -6,8 +6,6 @@ class Seat {
   /// AVAILABLE / LOCKED / SOLD
   String status;
 
-  /// 仅用于前端“临时选择”（UI高亮、底部统计）
-  /// 注意：最终应该由后端 LOCKED/SOLD 决定，但为了不大改UI先保留。
   bool selected;
 
   Seat({

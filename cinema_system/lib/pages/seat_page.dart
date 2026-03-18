@@ -1,8 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../models/seat.dart';
 import 'snack_page.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class SeatPage extends StatefulWidget {
   final String hallType;
@@ -16,83 +18,341 @@ class SeatPage extends StatefulWidget {
   State<SeatPage> createState() => _SeatPageState();
 }
 
-class _SeatPageState extends State<SeatPage> {
+class _SeatPageState extends State<SeatPage>
+    with SingleTickerProviderStateMixin {
+  static const String _baseUrl = 'http://localhost:8080';
+
   late List<Seat> seats;
   late int rows;
   late int seatsPerSide;
 
-      Future<void> _lockSeat(Seat seat) async {
-  if (!seat.isAvailable) return;
+  bool _isLoading = true;
+  String? _error;
 
-  final response = await http.post(
-    Uri.parse('http://localhost:8080/api/seats/${seat.id}/lock'),
-  );
-
-  if (response.statusCode == 200) {
-    setState(() {
-      seat.status = 'LOCKED';
-      seat.selected = true;
-    });
-  } else {
-    print("Lock failed");
-  }
-}
-
-  double _priceByHall() {
-  switch (widget.hallType) {
-    case 'IMAX':
-      return 18.99;
-    case 'VIP':
-      return 25.99;
-    default:
-      return 15.99;
-  }
-}
+  late AnimationController _animController;
+  late Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
-    _configureHall();
+
     seats = [];
+    _configureHall();
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+
     _loadSeatsFromBackend();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  List<Seat> _findBestSeats(int count) {
+    if (seats.isEmpty) return [];
+
+    final centerCol = seatsPerSide;
+    final idealRow = (rows * 0.6).round();
+
+    final scored = <MapEntry<Seat, double>>[];
+
+    for (final seat in seats) {
+      if (!seat.isAvailable) continue;
+
+      final dx = (seat.col - centerCol).abs();
+      final dy = (seat.row - idealRow).abs();
+      final score = dx * 1.5 + dy;
+
+      scored.add(MapEntry(seat, score));
+    }
+
+    scored.sort((a, b) => a.value.compareTo(b.value));
+    return scored.take(count).map((e) => e.key).toList();
   }
 
   void _configureHall() {
     switch (widget.hallType) {
       case 'IMAX':
         rows = 15;
-        seatsPerSide = 10; // 15 × 20 = 300
+        seatsPerSide = 10;
         break;
       case 'VIP':
         rows = 3;
-        seatsPerSide = 2; // 3 × 4 = 12
+        seatsPerSide = 2;
         break;
       default:
         rows = 5;
-        seatsPerSide = 5; // 5 × 10 = 50
+        seatsPerSide = 5;
+    }
+  }
+
+  int _hallIdByType() {
+    switch (widget.hallType) {
+      case 'IMAX':
+        return 1;
+      case 'VIP':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  double _priceByHall() {
+    switch (widget.hallType) {
+      case 'IMAX':
+        return 18.99;
+      case 'VIP':
+        return 25.99;
+      default:
+        return 15.99;
     }
   }
 
   double _calculateSeatSize(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    double aisleWidth = widget.hallType == 'IMAX' ? 60 : 40;
-    double padding = 120;
-    int totalPerRow = seatsPerSide * 2;
-    double available = screenWidth - padding - aisleWidth;
+    final aisleWidth = widget.hallType == 'IMAX' ? 60.0 : 40.0;
+    const padding = 120.0;
+    final totalPerRow = seatsPerSide * 2;
+
+    if (totalPerRow <= 0) return 24;
+
+    final available = screenWidth - padding - aisleWidth;
     double size = available / totalPerRow - 8;
 
     if (widget.hallType == 'VIP') {
       size *= 2.0;
+      return size.clamp(30, 100);
     }
-    if (widget.hallType == 'VIP') {
-      return size.clamp(30, 100);   // VIP 更大
-    }
+
     return size.clamp(18, 60);
+  }
+
+  Future<void> _loadSeatsFromBackend() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final hallId = _hallIdByType();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/halls/$hallId/seats'),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load seats: ${response.statusCode}');
+      }
+
+      final List data = json.decode(response.body);
+
+      final loadedSeats = data.map<Seat>((jsonSeat) {
+        final status = (jsonSeat['status'] ?? 'AVAILABLE').toString();
+
+        return Seat(
+          id: jsonSeat['id'],
+          row: jsonSeat['rowNum'],
+          col: jsonSeat['colNum'],
+          status: status,
+          selected: status == 'LOCKED',
+        );
+      }).toList();
+
+      _syncLayoutWithBackend(loadedSeats);
+
+      if (!mounted) return;
+
+      setState(() {
+        seats = loadedSeats;
+        _isLoading = false;
+      });
+
+      _animController.reset();
+      _animController.forward();
+    } catch (e) {
+      debugPrint('Load seats error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _syncLayoutWithBackend(List<Seat> loadedSeats) {
+    if (loadedSeats.isEmpty) return;
+
+    // IMAX 保持固定 15×20
+    if (widget.hallType == 'IMAX') return;
+
+    final maxRow = loadedSeats.fold<int>(
+      0,
+      (prev, seat) => seat.row > prev ? seat.row : prev,
+    );
+
+    final maxCol = loadedSeats.fold<int>(
+      0,
+      (prev, seat) => seat.col > prev ? seat.col : prev,
+    );
+
+    if (maxRow > 0) {
+      rows = maxRow;
+    }
+
+    if (maxCol > 0) {
+      seatsPerSide = (maxCol / 2).ceil();
+    }
+  }
+
+  Future<void> _lockSeat(Seat seat) async {
+    if (!seat.isAvailable) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/seats/${seat.id}/lock'),
+      );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+
+        setState(() {
+          seat.status = 'LOCKED';
+          seat.selected = true;
+        });
+      } else {
+        debugPrint('Lock failed: ${response.statusCode}');
+        _showMessage('Seat lock failed');
+      }
+    } catch (e) {
+      debugPrint('Lock error: $e');
+      _showMessage('Network error while locking seat');
+    }
+  }
+
+  Future<void> _unlockSeat(Seat seat) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/seats/${seat.id}/unlock'),
+      );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+
+        setState(() {
+          seat.status = 'AVAILABLE';
+          seat.selected = false;
+        });
+      } else {
+        debugPrint('Unlock failed: ${response.statusCode}');
+        _showMessage('Seat unlock failed');
+      }
+    } catch (e) {
+      debugPrint('Unlock error: $e');
+      _showMessage('Network error while unlocking seat');
+    }
+  }
+
+  void _handleSeatTap(Seat seat) {
+    if (seat.isSold) return;
+
+    if (seat.status == 'LOCKED') {
+      _unlockSeat(seat);
+      return;
+    }
+
+    if (seat.status == 'AVAILABLE') {
+      _lockSeat(seat);
+    }
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
+
+
+Seat? _seatAt(int rowNumber, int colNumber) {
+  if (seats.isEmpty) return null;
+
+  final minCol = seats
+      .map((e) => e.col)
+      .reduce((a, b) => a < b ? a : b);
+
+  try {
+    return seats.firstWhere(
+      (s) =>
+          s.row == rowNumber &&
+          s.col == colNumber + minCol - 1, // ⭐ 自动对齐
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+  int get _displayRows {
+    if (rows <= 0) return 0;
+    return rows;
+  }
+
+  double _curveOffsetForRow(int rowIndex) {
+    if (widget.hallType != 'IMAX') return 0;
+
+    final middle = (_displayRows - 1) / 2;
+    return (rowIndex - middle).abs() * 4;
+  }
+
+  Widget _buildSeatOrPlaceholder({
+    required int rowNumber,
+    required int colNumber,
+    required double seatSize,
+    required int rowIndex,
+  }) {
+    final seat = _seatAt(rowNumber, colNumber);
+
+    if (seat == null) {
+      return _emptySeatPlaceholder(seatSize);
+    }
+
+    return _seatWidget(seat, seatSize, rowIndex);
+  }
+
+  Widget _emptySeatPlaceholder(double size) {
+    if (widget.hallType == 'VIP') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: SizedBox(
+          width: size,
+          height: size * 0.7,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: SizedBox(
+        width: size,
+        height: size,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    double seatSize = _calculateSeatSize(context);
+    final seatSize = _calculateSeatSize(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
@@ -101,168 +361,235 @@ class _SeatPageState extends State<SeatPage> {
         elevation: 0,
         title: Text('Select Seats (${widget.hallType})'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Best Seats',
+            onPressed: () {
+              final bestSeats = _findBestSeats(2);
+
+              setState(() {
+                for (final seat in bestSeats) {
+                  seat.status = 'LOCKED';
+                  seat.selected = true;
+                }
+              });
+            },
+          ),
+          IconButton(
+            onPressed: _loadSeatsFromBackend,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh seats',
+          ),
+        ],
       ),
       body: Column(
         children: [
           const SizedBox(height: 10),
           _screenIndicator(),
           const SizedBox(height: 20),
-
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  ...List.generate(rows, (rowIndex) {
-                    String rowLabel =
-                        String.fromCharCode(65 + rowIndex);
-
-                    double curveOffset = 0;
-                    if (widget.hallType == 'IMAX') {
-                      double middle = rows / 2;
-                      curveOffset =
-                          (rowIndex - middle).abs() * 4;
-                    }
-
-                    return Padding(
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 6),
-                      child: Transform.translate(
-                        offset: Offset(0, curveOffset),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-
-                            SizedBox(
-                              width: 28,
-                              child: Text(
-                                rowLabel,
-                                style: const TextStyle(
-                                    color: Colors.white54),
-                              ),
-                            ),
-
-                            ...List.generate(
-                                seatsPerSide, (seatIndex) {
-                              int realIndex =
-                                  rowIndex *
-                                          (seatsPerSide * 2) +
-                                      seatIndex;
-                              return _seatWidget(
-                                  seats[realIndex],
-                                  seatSize,
-                                  rowIndex);
-                            }),
-
-                            SizedBox(
-                                width: widget.hallType ==
-                                        'IMAX'
-                                    ? 60
-                                    : 40),
-
-                            ...List.generate(
-                                seatsPerSide, (seatIndex) {
-                              int realIndex =
-                                  rowIndex *
-                                          (seatsPerSide * 2) +
-                                      seatIndex +
-                                      seatsPerSide;
-                              return _seatWidget(
-                                  seats[realIndex],
-                                  seatSize,
-                                  rowIndex);
-                            }),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: 20),
-
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 40),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text("EXIT",
-                            style: TextStyle(
-                                color: Colors.redAccent)),
-                        Text("EXIT",
-                            style: TextStyle(
-                                color: Colors.redAccent)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildBody(seatSize),
           ),
-
           _bottomBar(),
         ],
       ),
     );
   }
 
-  Widget _screenIndicator() {
-    return Column(
-      children: [
-        Container(
-          width: widget.hallType == 'IMAX'
-              ? 420
-              : 280,
-          height: widget.hallType == 'IMAX'
-              ? 60
-              : 40,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(
-                  widget.hallType == 'IMAX'
-                      ? 120
-                      : 80),
-            ),
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF6C63FF)
-                    .withOpacity(0.8),
-                const Color(0xFF8A85FF)
-                    .withOpacity(0.5),
+  Widget _buildBody(double seatSize) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.redAccent,
+                size: 40,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Failed to load seats',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadSeatsFromBackend,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadSeatsFromBackend,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: ScaleTransition(
+            scale: Tween<double>(
+              begin: 0.95,
+              end: 1.0,
+            ).animate(_fadeAnim),
+            child: Column(
+              children: [
+                ...List.generate(_displayRows, (rowIndex) {
+                  final rowNumber = rowIndex + 1;
+                  final rowLabel = String.fromCharCode(65 + rowIndex);
+                  final curveOffset = _curveOffsetForRow(rowIndex);
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Transform.translate(
+                      offset: Offset(0, curveOffset),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              rowLabel,
+                              style: const TextStyle(color: Colors.white54),
+                            ),
+                          ),
+
+                          // 左侧座位
+                          ...List.generate(seatsPerSide, (seatIndex) {
+                            final colNumber = seatIndex + 1;
+                            return _buildSeatOrPlaceholder(
+                              rowNumber: rowNumber,
+                              colNumber: colNumber,
+                              seatSize: seatSize,
+                              rowIndex: rowIndex,
+                            );
+                          }),
+
+                          // 中间走道
+                          SizedBox(
+                            width: widget.hallType == 'IMAX' ? 60 : 40,
+                          ),
+
+                          // 右侧座位
+                          ...List.generate(seatsPerSide, (seatIndex) {
+                            final colNumber = seatsPerSide + seatIndex + 1;
+                            return _buildSeatOrPlaceholder(
+                              rowNumber: rowNumber,
+                              colNumber: colNumber,
+                              seatSize: seatSize,
+                              rowIndex: rowIndex,
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 20),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text(
+                        'EXIT',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                      Text(
+                        'EXIT',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'SCREEN',
-          style: TextStyle(
-            color: Colors.white54,
-            letterSpacing: 2,
-            fontSize: 12,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _bottomBar() {
-  final selectedCount =
-      seats.where((s) => s.isLocked).length;
+  Widget _screenIndicator() {
+  return Column(
+    children: [
+      Container(
+        width: widget.hallType == 'IMAX' ? 420 : 280,
+        height: widget.hallType == 'IMAX' ? 70 : 45,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(
+              widget.hallType == 'IMAX' ? 140 : 90,
+            ),
+          ),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF6C63FF),
+              Color(0xFF9A8CFF),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6C63FF).withOpacity(0.8),
+              blurRadius: 40,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        'SCREEN',
+        style: TextStyle(
+          color: Colors.white70,
+          letterSpacing: 4,
+          fontSize: 12,
+        ),
+      ),
+    ],
+  );
+}
 
-  final pricePerSeat = _priceByHall();   // ⭐ 用函数
+  Widget _bottomBar() {
+  final selectedSeats = seats.where((s) => s.isLocked).toList();
+  final selectedCount = selectedSeats.length;
+  final pricePerSeat = _priceByHall();
   final total = selectedCount * pricePerSeat;
 
   return Container(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 26),
     decoration: BoxDecoration(
-      color: const Color(0xFF1A1A2E),
+      color: const Color(0xFF121226),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.4),
-          blurRadius: 20,
-          offset: const Offset(0, -4),
+          color: Colors.black.withOpacity(0.7),
+          blurRadius: 30,
+          offset: const Offset(0, -6),
         ),
       ],
     ),
@@ -272,18 +599,20 @@ class _SeatPageState extends State<SeatPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$selectedCount seats',
+              'TOTAL',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontWeight: FontWeight.bold,
+                color: Colors.white.withOpacity(0.5),
+                letterSpacing: 2,
+                fontSize: 12,
               ),
             ),
+            const SizedBox(height: 4),
             Text(
               '£${total.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Color(0xFF6C63FF),
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 22,
               ),
             ),
           ],
@@ -305,9 +634,21 @@ class _SeatPageState extends State<SeatPage> {
                     ),
                   );
                 },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C63FF),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 28, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            elevation: 10,
+          ),
           child: const Text(
-            'Confirm',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            'CONFIRM',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
           ),
         ),
       ],
@@ -315,79 +656,36 @@ class _SeatPageState extends State<SeatPage> {
   );
 }
 
-  Future<void> _loadSeatsFromBackend() async {
-  final response = await http.get(
-    Uri.parse('http://localhost:8080/api/halls/1/seats'),
-  );
+  Widget _seatWidget(Seat seat, double size, int rowIndex) {
+    final totalRows = _displayRows == 0 ? 1 : _displayRows;
 
-  if (response.statusCode == 200) {
-    List data = json.decode(response.body);
+    if (widget.hallType == 'IMAX') {
+      final scale = 0.85 + (rowIndex / totalRows) * 0.25;
+      size *= scale;
+    }
 
-    setState(() {
-      seats = data.map((jsonSeat) {
-        return Seat(
-          id: jsonSeat['id'],
-          row: jsonSeat['rowNum'],
-          col: jsonSeat['colNum'],
-          status: jsonSeat['status'],
-          selected: false,
-        );
-      }).toList();
-    });
-  } else {
-    print("Failed to load seats");
-  }
-}
+    if (widget.hallType == 'VIP') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: _VipSeatItem(
+          size: size,
+          selected: seat.selected,
+          sold: seat.isSold,
+          onTap: () => _handleSeatTap(seat),
+        ),
+      );
+    }
 
-  Widget _seatWidget(
-    Seat seat, double size, int rowIndex) {
-
-  // 🎬 IMAX 透视缩放
-  if (widget.hallType == 'IMAX') {
-    double scale =
-        0.85 + (rowIndex / rows) * 0.25;
-    size *= scale;
-  }
-
-  // 💎 VIP 沙发
-  if (widget.hallType == 'VIP') {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 6),
-      child: _VipSeatItem(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: _SeatItem(
         size: size,
-        selected: seat.selected,
-        sold: seat.sold,
-        onTap: () {
-          if (seat.sold) return;
-          setState(() {
-            seat.selected = !seat.selected;
-          });
-        },
+        seat: seat,
+        onTap: () => _handleSeatTap(seat),
       ),
     );
   }
-
-  // ⭐ 普通厅
-  return Padding(
-    padding:
-        const EdgeInsets.symmetric(horizontal: 4),
-    child: _SeatItem(
-              size: size,
-              seat: seat,
-              onTap: () {
-                if (!seat.isAvailable) return;
-                _lockSeat(seat);
-              },
-            ),
-  );
 }
-}
-
-
-  @override
-  State<_SeatItem> createState() =>
-      _SeatItemState();
 
 class _SeatItem extends StatefulWidget {
   final double size;
@@ -405,51 +703,50 @@ class _SeatItem extends StatefulWidget {
 }
 
 class _SeatItemState extends State<_SeatItem> {
-  bool hovering = false;
   bool pressing = false;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => hovering = true),
-      onExit: (_) => setState(() => hovering = false),
-      child: GestureDetector(
-        onTapDown: (_) {
-          if (!widget.seat.isAvailable) return;
-          setState(() => pressing = true);
-        },
-        onTapUp: (_) {
-          if (!widget.seat.isAvailable) return;
-          setState(() => pressing = false);
-          widget.onTap();
-        },
-        onTapCancel: () => setState(() => pressing = false),
-        child: AnimatedScale(
-          scale: pressing ? 0.9 : 1,
-          duration: const Duration(milliseconds: 100),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: widget.size,
-            height: widget.size,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: widget.seat.isSold
-                  ? Colors.grey.withOpacity(0.4)
-                  : widget.seat.isLocked
-                      ? const Color(0xFF6C63FF)
-                      : hovering
-                          ? Colors.white.withOpacity(0.35)
-                          : Colors.white.withOpacity(0.15),
-              boxShadow: widget.seat.isLocked
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF6C63FF)
-                            .withOpacity(0.6),
-                        blurRadius: 10,
-                      ),
-                    ]
-                  : [],
-            ),
+    return GestureDetector(
+      onTapDown: (_) {
+        if (widget.seat.isSold) return;
+        setState(() => pressing = true);
+      },
+      onTapUp: (_) {
+        if (widget.seat.isSold) return;
+        setState(() => pressing = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => pressing = false),
+
+      child: AnimatedScale(
+        scale: pressing ? 0.92 : 1,
+        duration: const Duration(milliseconds: 100),
+
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+
+            color: widget.seat.isSold
+                ? Colors.grey.withOpacity(0.4)
+                : widget.seat.selected
+                    ? const Color(0xFF6C63FF)
+                    : widget.seat.isLocked
+                        ? Colors.orange.withOpacity(0.6)
+                        : Colors.white.withOpacity(0.15),
+
+            boxShadow: widget.seat.selected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF6C63FF).withOpacity(0.5),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : [],
           ),
         ),
       ),
@@ -471,37 +768,30 @@ class _VipSeatItem extends StatefulWidget {
   });
 
   @override
-  State<_VipSeatItem> createState() =>
-      _VipSeatItemState();
+  State<_VipSeatItem> createState() => _VipSeatItemState();
 }
 
-class _VipSeatItemState
-    extends State<_VipSeatItem> {
+class _VipSeatItemState extends State<_VipSeatItem> {
   bool hovering = false;
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) =>
-          setState(() => hovering = true),
-      onExit: (_) =>
-          setState(() => hovering = false),
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
       child: GestureDetector(
-        onTap:
-            widget.sold ? null : widget.onTap,
+        onTap: widget.sold ? null : widget.onTap,
         child: AnimatedContainer(
-          duration:
-              const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 250),
           width: widget.size,
           height: widget.size * 0.7,
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             gradient: widget.sold
                 ? LinearGradient(
                     colors: [
                       Colors.grey.shade700,
-                      Colors.grey.shade600
+                      Colors.grey.shade600,
                     ],
                   )
                 : widget.selected
@@ -514,29 +804,23 @@ class _VipSeatItemState
                     : hovering
                         ? LinearGradient(
                             colors: [
-                              Colors.white
-                                  .withOpacity(0.4),
-                              Colors.white
-                                  .withOpacity(0.2),
+                              Colors.white.withOpacity(0.4),
+                              Colors.white.withOpacity(0.2),
                             ],
                           )
                         : LinearGradient(
                             colors: [
-                              Colors.white
-                                  .withOpacity(0.25),
-                              Colors.white
-                                  .withOpacity(0.15),
+                              Colors.white.withOpacity(0.2),
+                              Colors.white.withOpacity(0.1),
                             ],
                           ),
             boxShadow: widget.selected
                 ? [
                     BoxShadow(
-                      color: const Color(
-                              0xFF6C63FF)
-                          .withOpacity(0.6),
-                      blurRadius: 16,
+                      color: const Color(0xFF6C63FF).withOpacity(0.7),
+                      blurRadius: 18,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -544,9 +828,7 @@ class _VipSeatItemState
             child: Icon(
               Icons.weekend,
               size: widget.size * 0.4,
-              color: widget.sold
-                  ? Colors.white38
-                  : Colors.white,
+              color: widget.sold ? Colors.white38 : Colors.white,
             ),
           ),
         ),
