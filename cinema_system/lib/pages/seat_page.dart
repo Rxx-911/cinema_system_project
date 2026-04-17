@@ -1,17 +1,17 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
 import '../models/seat.dart';
 import 'snack_page.dart';
 
 class SeatPage extends StatefulWidget {
   final String hallType;
+  final bool isMember;
 
   const SeatPage({
     super.key,
     required this.hallType,
+    required this.isMember,
   });
 
   @override
@@ -26,6 +26,8 @@ class _SeatPageState extends State<SeatPage>
   late int rows;
   late int seatsPerSide;
 
+  Map<String, double> pricingRules = {};
+
   bool _isLoading = true;
   String? _error;
 
@@ -33,24 +35,57 @@ class _SeatPageState extends State<SeatPage>
   late Animation<double> _fadeAnim;
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    seats = [];
-    _configureHall();
+  seats = [];
+  _configureHall();
 
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
+  _animController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  );
+
+  _fadeAnim = CurvedAnimation(
+    parent: _animController,
+    curve: Curves.easeOut,
+  );
+
+  _loadSeatsFromBackend();
+  _loadPricingRules();
+
+  Future.delayed(const Duration(milliseconds: 600), () {
+    if (mounted) {
+      _showDiscountDialog();
+    }
+  });
+}
+
+Future<void> _loadPricingRules() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/rules'),
     );
 
-    _fadeAnim = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOut,
-    );
+    final List data = json.decode(response.body);
 
-    _loadSeatsFromBackend();
+    Map<String, double> temp = {};
+
+    for (var rule in data) {
+      if (rule["enabled"] == true) {
+        temp[rule["ruleType"]] = rule["value"];
+      }
+    }
+
+    setState(() {
+      pricingRules = temp;
+    });
+
+    print("Rules loaded: $pricingRules");
+  } catch (e) {
+    print("Load rules failed: $e");
   }
+}
 
   @override
   void dispose() {
@@ -579,8 +614,14 @@ Seat? _seatAt(int rowNumber, int colNumber) {
   final selectedSeats = seats.where((s) => s.isLocked).toList();
   final selectedCount = selectedSeats.length;
   final pricePerSeat = _priceByHall();
-  final total = selectedCount * pricePerSeat;
-
+  final total = calculateFinalPrice(
+      basePrice: selectedCount * pricePerSeat,
+      ticketCount: selectedCount,
+      totalSold: 120, // ⭐ 先写死，后面接后端
+      time: DateTime.now(),
+      isMember: widget.isMember, // ⭐ 后面接用户系统
+    );
+    
   return Container(
     padding: const EdgeInsets.fromLTRB(20, 16, 20, 26),
     decoration: BoxDecoration(
@@ -615,7 +656,16 @@ Seat? _seatAt(int rowNumber, int colNumber) {
                 fontSize: 22,
               ),
             ),
-          ],
+             const SizedBox(height: 4),
+
+              const Text(
+                "🔥 Dynamic Pricing Applied",
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontSize: 12,
+                ),
+              ),
+           ],
         ),
 
         const Spacer(),
@@ -683,6 +733,104 @@ Seat? _seatAt(int rowNumber, int colNumber) {
         seat: seat,
         onTap: () => _handleSeatTap(seat),
       ),
+    );
+  }
+
+      double calculateFinalPrice({
+        required double basePrice,
+        required int ticketCount,
+        required int totalSold,
+        required DateTime time,
+        required bool isMember,
+      }) {
+        double price = basePrice;
+
+        /// 🎟️ 销量规则
+        if (totalSold > 100) {
+          price *= 1.1;
+        } else if (totalSold < 30) {
+          price *= 0.9;
+        }
+
+        /// 🕒 黄金时间
+        if (time.hour >= 18 && time.hour <= 22) {
+          price *= 1.15;
+        }
+
+        /// 📅 周二
+        if (time.weekday == DateTime.tuesday) {
+          price *= 0.5;
+        }
+
+        /// 📅 节假日
+        if (_isHoliday(time)) {
+          price *= 0.8;
+        }
+
+        /// 👑 会员
+        if (isMember) {
+          price *= 0.8;
+        }
+
+        return price;
+      }
+
+      /// ⭐ 节假日判断
+      bool _isHoliday(DateTime time) {
+        return (time.month == 12 && time.day == 25);
+      }
+  void _showDiscountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+
+                const Text(
+                  "🎉 Special Offer",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                const Text(
+                  "Tuesday → 50% OFF",
+                  style: TextStyle(color: Colors.white70),
+                ),
+
+                const SizedBox(height: 6),
+
+                const Text(
+                  "Members → 20% OFF",
+                  style: TextStyle(color: Colors.white70),
+                ),
+
+                const SizedBox(height: 16),
+
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text("OK"),
+                )
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

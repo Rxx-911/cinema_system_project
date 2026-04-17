@@ -1,6 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'movie_list_page.dart';
+import 'register_page.dart';
+  import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'Adminpage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,6 +27,34 @@ class _LoginPageState extends State<LoginPage>
 
   bool loading = false;
   bool _pressed = false; // ⭐ 按压状态
+  bool isMember = false; // ⭐ 新增
+
+
+  Future<void> _showMemberDialog() async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: const Text("Membership"),
+        content: const Text("Are you a member?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("No"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes"),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (result != null) {
+    isMember = result;
+  }
+}
 
   @override
   void initState() {
@@ -54,28 +86,62 @@ class _LoginPageState extends State<LoginPage>
     super.dispose();
   }
 
-  void login() async {
-    print("LOGIN CLICKED"); // ⭐ 调试
 
-    if (usernameController.text.isEmpty ||
-        passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter username and password")),
-      );
-      return;
-    }
 
-    setState(() => loading = true);
+void login() async {
+  if (usernameController.text.isEmpty ||
+      passwordController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Enter username and password")),
+    );
+    return;
+  }
 
-    await Future.delayed(const Duration(seconds: 1));
+  setState(() => loading = true);
+
+  try {
+    final response = await http.post(
+      Uri.parse("http://127.0.0.1:8080/api/users/login"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "username": usernameController.text,
+        "password": passwordController.text,
+        
+      }),
+    );
 
     setState(() => loading = false);
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MovieListPage()),
+    print("Response: ${response.body}");
+
+    if (response.statusCode == 200 &&
+    response.body.contains("success")) {
+
+  await _showMemberDialog(); // ⭐ 弹窗
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => MovieListPage(
+        username: usernameController.text,
+        isMember: isMember, // ⭐ 传递
+      ),
+    ),
+  );
+}else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response.body)),
+      );
+    }
+
+  } catch (e) {
+    setState(() => loading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Connection failed")),
     );
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -261,10 +327,38 @@ class _LoginPageState extends State<LoginPage>
           const SizedBox(height: 15),
 
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegisterPage()),
+              );
+            },
             child: const Text(
               "Create Account",
               style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          /// 👇 Admin入口
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminPage(),
+                  ),
+                );
+              },
+              child: const Text(
+                "Admin",
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
         ],

@@ -7,7 +7,14 @@ import '../widgets/animated_background.dart';
 import 'my_page.dart';
 
 class MovieListPage extends StatefulWidget {
-  const MovieListPage({super.key});
+  final String username;
+  final bool isMember;
+
+      const MovieListPage({
+      super.key,
+      required this.username,
+      required this.isMember,
+    });
 
   @override
   State<MovieListPage> createState() => _MovieListPageState();
@@ -46,6 +53,7 @@ class _MovieListPageState extends State<MovieListPage> {
                         movie.title != "Interstellar")
                     .take(6)
                     .toList(),
+                    isMember: widget.isMember,
               ),
 
               const SizedBox(height: 20),
@@ -82,7 +90,7 @@ class _MovieListPageState extends State<MovieListPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const MyPage(),
+                builder: (_) => MyPage(username: widget.username),
               ),
             );
           },
@@ -201,7 +209,9 @@ class _MovieListPageState extends State<MovieListPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: filteredMovies.length,
         itemBuilder: (context, index) {
-          return _MovieCard(movie: filteredMovies[index]);
+          return _MovieCard(movie: filteredMovies[index],
+          isMember: widget.isMember,
+          );
         },
       ),
     );
@@ -214,8 +224,12 @@ class _MovieListPageState extends State<MovieListPage> {
 
 class FeaturedBanner extends StatefulWidget {
   final List<Movie> movies;
+  final bool isMember;
 
-  const FeaturedBanner({super.key, required this.movies});
+  const FeaturedBanner({super.key,
+   required this.movies,
+   required this.isMember,
+   });
 
   @override
   State<FeaturedBanner> createState() => _FeaturedBannerState();
@@ -294,7 +308,9 @@ class _FeaturedBannerState extends State<FeaturedBanner> {
           context,
           MaterialPageRoute(
             builder: (_) =>
-                ShowingPage(movieTitle: movie.title),
+                ShowingPage(movieTitle: movie.title,
+                isMember: widget.isMember,
+                ),
           ),
         );
       },
@@ -348,8 +364,11 @@ class _FeaturedBannerState extends State<FeaturedBanner> {
 
 class _MovieCard extends StatefulWidget {
   final Movie movie;
+  final bool isMember;
 
-  const _MovieCard({required this.movie});
+  const _MovieCard({required this.movie,
+  required this.isMember,
+  });
 
   @override
   State<_MovieCard> createState() => _MovieCardState();
@@ -386,7 +405,9 @@ class _MovieCardState extends State<_MovieCard>
                   PageRouteBuilder(
                     transitionDuration: const Duration(milliseconds: 400),
                     pageBuilder: (context, animation, secondaryAnimation) =>
-                        ShowingPage(movieTitle: widget.movie.title),
+                        ShowingPage(movieTitle: widget.movie.title,
+                        isMember: widget.isMember,
+                        ),
                     transitionsBuilder:
                         (context, animation, secondaryAnimation, child) {
                       final fadeAnimation =
@@ -408,7 +429,7 @@ class _MovieCardState extends State<_MovieCard>
                   children: [
                     // 🎬 海报
                     Hero(
-                      tag: "${widget.movie.id}_poster",
+                      tag: widget.movie.title, 
                       child: Image.asset(
                         widget.movie.poster,
                         fit: BoxFit.cover,

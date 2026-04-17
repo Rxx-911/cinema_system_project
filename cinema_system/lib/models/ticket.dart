@@ -1,13 +1,26 @@
+enum RefundStatus { none, pending, approved, rejected }
+
+enum TicketStatus { active, refunded }
+
 class Ticket {
-  final String id;
-  final String movieTitle;
-  final DateTime showTime;
-  final int seatNumber;
+  String id;
+  String movieTitle;
+  String seatLabel;
+  String hallName;
+  double price;
+  DateTime showTime;
+
+  RefundStatus refundStatus;
+  TicketStatus ticketStatus;
 
   Ticket({
     required this.id,
     required this.movieTitle,
+    required this.seatLabel,
+    required this.hallName,
+    required this.price,
     required this.showTime,
-    required this.seatNumber,
+    this.refundStatus = RefundStatus.none,
+    this.ticketStatus = TicketStatus.active,
   });
 }

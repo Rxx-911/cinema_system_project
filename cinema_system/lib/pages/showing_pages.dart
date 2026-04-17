@@ -4,10 +4,12 @@ import 'seat_page.dart';
 
 class ShowingPage extends StatelessWidget {
   final String movieTitle;
+  final bool isMember; 
 
   const ShowingPage({
     super.key,
     required this.movieTitle,
+    required this.isMember, 
   });
 
   @override
@@ -29,7 +31,7 @@ class ShowingPage extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 60),
                   child: Center(
                     child: Hero(
-                      tag: "${movie.id}_poster",
+                      tag: "${movie.id}_${DateTime.now().millisecondsSinceEpoch}",
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 360),
 
@@ -188,15 +190,14 @@ class ShowingPage extends StatelessWidget {
                               const Icon(Icons.event_seat),
                           onTap: () {
                             Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    SeatPage(
-                                        hallType:
-                                            showing
-                                                .hallType),
-                              ),
-                            );
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SeatPage(
+                                    hallType: showing.hallType, // ⭐ 从数据拿
+                                    isMember: isMember,         // ⭐ 直接用变量
+                                  ),
+                                ),
+                              );
                           },
                         ),
                       );

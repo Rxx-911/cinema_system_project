@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'pages/movie_list_page.dart';
 import 'pages/login_page.dart';
 
 
