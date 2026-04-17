@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-@Service
+//@Service
 public class BookingService {
 
     private final Map<Long, Booking> bookings = new HashMap<>();
