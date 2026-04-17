@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-@RestController
+//@RestController
 @RequestMapping("/tickets")
 public class TicketController {
 
