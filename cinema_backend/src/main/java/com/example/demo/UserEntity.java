@@ -3,6 +3,7 @@ package com.example.demo;
 import jakarta.persistence.*;
 
 @Entity
+@Table(name = "user_entity") // ⭐ 明确表名（非常重要）
 public class UserEntity {
 
     @Id
@@ -10,12 +11,25 @@ public class UserEntity {
     private Integer id;
 
     private String username;
+
+    @Column(name = "user_id") // ⭐ 关键修复点
     private String userId;
+
     private String phone;
+
     private String nickname;
+
     private String password;
 
     // ===== Getter & Setter =====
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
 
     public String getUsername() {
         return username;
