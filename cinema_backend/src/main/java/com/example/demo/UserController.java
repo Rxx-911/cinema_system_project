@@ -30,13 +30,11 @@ public class UserController {
 @PostMapping("/login")
 public String login(@RequestBody UserEntity user) {
 
-    List<UserEntity> users = repo.findAll();
+    UserEntity found = repo.findByUsername(user.getUsername());
 
-    for (UserEntity u : users) {
-        if (u.getUsername().equals(user.getUsername()) &&
-            u.getPassword().equals(user.getPassword())) {
-            return "success";
-        }
+    if (found != null &&
+        found.getPassword().equals(user.getPassword())) {
+        return "success";
     }
 
     return "Invalid username or password";
