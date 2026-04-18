@@ -104,7 +104,7 @@ void login() async {
       Uri.parse("/api/users/loginhttps://cinema-backend-x2gl.onrender.com"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
-        "username": usernameController.text,
+        "userId": usernameController.text,
         "password": passwordController.text,
         
       }),

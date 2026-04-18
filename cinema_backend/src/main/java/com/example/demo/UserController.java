@@ -20,24 +20,28 @@ public class UserController {
         return repo.findAll();
     }
 
-    // 注册用户
+    // 注册
     @PostMapping
     public UserEntity create(@RequestBody UserEntity user) {
         return repo.save(user);
     }
 
-    // 登录接口
-@PostMapping("/login")
-public String login(@RequestBody UserEntity user) {
+    // ⭐⭐⭐ 登录接口（关键修复）
+    @PostMapping("/login")
+    public String login(@RequestBody UserEntity user) {
 
-    UserEntity found = repo.findByUsername(user.getUsername());
+        System.out.println("Login try: " + user.getUserId());
 
-    if (found != null &&
-        found.getPassword().equals(user.getPassword())) {
-        return "success";
+        UserEntity found = repo.findByUserId(user.getUserId());
+
+        if (found != null) {
+            System.out.println("DB user: " + found.getUserId());
+
+            if (found.getPassword().equals(user.getPassword())) {
+                return "success";
+            }
+        }
+
+        return "Invalid username or password";
     }
-
-    return "Invalid username or password";
-}
-
 }

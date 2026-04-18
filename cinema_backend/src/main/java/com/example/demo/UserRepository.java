@@ -4,5 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<UserEntity, Integer> {
 
-    UserEntity findByUsername(String username); // ⭐ 关键
+    // ⭐ 用 userId 查（关键）
+    UserEntity findByUserId(String userId);
 }
