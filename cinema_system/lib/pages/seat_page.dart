@@ -20,8 +20,7 @@ class SeatPage extends StatefulWidget {
 
 class _SeatPageState extends State<SeatPage>
     with SingleTickerProviderStateMixin {
-  static const String _baseUrl = 'http://localhost:8080';
-
+  static const String _baseUrl = 'https://cinema-backend-x2gl.onrender.com';
   late List<Seat> seats;
   late int rows;
   late int seatsPerSide;

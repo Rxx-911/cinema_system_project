@@ -25,4 +25,21 @@ public class UserController {
     public UserEntity create(@RequestBody UserEntity user) {
         return repo.save(user);
     }
+
+    // 登录接口
+@PostMapping("/login")
+public String login(@RequestBody UserEntity user) {
+
+    List<UserEntity> users = repo.findAll();
+
+    for (UserEntity u : users) {
+        if (u.getUsername().equals(user.getUsername()) &&
+            u.getPassword().equals(user.getPassword())) {
+            return "success";
+        }
+    }
+
+    return "Invalid username or password";
+}
+
 }

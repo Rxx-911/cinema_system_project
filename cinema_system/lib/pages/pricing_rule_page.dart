@@ -20,7 +20,7 @@ class _PricingRulePageState extends State<PricingRulePage> {
   }
 
   Future<void> fetchRules() async {
-    final res = await http.get(Uri.parse("http://127.0.0.1:8080/api/rules"));
+    final res = await http.get(Uri.parse("https://cinema-backend-x2gl.onrender.com/api/rules"));
     setState(() {
       rules = json.decode(res.body);
     });
@@ -28,7 +28,7 @@ class _PricingRulePageState extends State<PricingRulePage> {
 
   Future<void> updateRule(int id, double value) async {
     await http.put(
-      Uri.parse("http://127.0.0.1:8080/api/rules/$id"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/rules/$id"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "value": value,

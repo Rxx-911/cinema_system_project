@@ -28,7 +28,7 @@ class _ShowingManagePageState extends State<ShowingManagePage> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://127.0.0.1:8080/api/showings"),
+        Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
       );
 
       print("🔥 Response: ${response.body}");
@@ -57,7 +57,7 @@ class _ShowingManagePageState extends State<ShowingManagePage> {
   /// ⭐ 新增排片（调用后端）
   Future<void> _addShowing(Map data) async {
     final response = await http.post(
-      Uri.parse("http://127.0.0.1:8080/api/showings"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(data),
     );
@@ -70,7 +70,7 @@ class _ShowingManagePageState extends State<ShowingManagePage> {
   /// ⭐ 删除排片（调用后端）
   Future<void> _deleteShowing(int id) async {
     await http.delete(
-      Uri.parse("http://127.0.0.1:8080/api/showings/$id"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings/$id"),
     );
 
     _loadShowings();

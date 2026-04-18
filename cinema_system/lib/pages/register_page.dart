@@ -86,7 +86,7 @@ class _RegisterPageState extends State<RegisterPage>
     print("Sending request...");
 
     final response = await http.post(
-      Uri.parse("http://127.0.0.1:8080/api/users/register"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/users/register"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "username": usernameController.text,

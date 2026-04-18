@@ -21,7 +21,7 @@ class _PricingManagePageState extends State<PricingManagePage> {
 
   Future<void> loadRules() async {
     final res = await http.get(
-      Uri.parse("http://localhost:8080/api/rules"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/rules"),
     );
 
     if (res.statusCode == 200) {
@@ -33,7 +33,7 @@ class _PricingManagePageState extends State<PricingManagePage> {
 
   Future<void> updateRule(Map rule) async {
     await http.put(
-      Uri.parse("http://localhost:8080/api/rules/${rule["id"]}"),
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/rules/${rule["id"]}"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(rule),
     );

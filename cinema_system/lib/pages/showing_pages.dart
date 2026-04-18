@@ -1,20 +1,59 @@
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import 'seat_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class ShowingPage extends StatelessWidget {
+class ShowingPage extends StatefulWidget {
   final String movieTitle;
-  final bool isMember; 
+  final bool isMember;
 
   const ShowingPage({
     super.key,
     required this.movieTitle,
-    required this.isMember, 
+    required this.isMember,
   });
 
   @override
+  State<ShowingPage> createState() => _ShowingPageState();
+}
+
+class _ShowingPageState extends State<ShowingPage> {
+
+  List backendShowings = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchShowings();
+  }
+
+  Future<void> fetchShowings() async {
+    try {
+      final response = await http.get(
+        Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        setState(() {
+          backendShowings = data
+              .where((s) => s["movie"] == widget.movieTitle)
+              .toList();
+          loading = false;
+        });
+      } else {
+        loading = false;
+      }
+    } catch (e) {
+      loading = false;
+    }
+  }
+  @override
   Widget build(BuildContext context) {
-    final movie = movies.firstWhere((m) => m.title == movieTitle);
+    final movie = movies.firstWhere((m) => m.title == widget.movieTitle);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1E),
@@ -177,27 +216,30 @@ class ShowingPage extends StatelessWidget {
                   delegate:
                       SliverChildBuilderDelegate(
                     (context, index) {
-                      final showing =
-                          showings[index];
+                      final dataList =
+                          backendShowings.isNotEmpty ? backendShowings : showings;
+
+                      final showing = dataList[index];
+
+                      // ✅ 先定义变量
+                      final time = showing["time"] ?? showing.time;
+                      final hall = showing["hall"] ?? showing.hallType;
+
                       return Card(
-                        margin:
-                            const EdgeInsets.only(
-                                bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          title: Text(
-                              '${showing.time} - ${showing.hallType}'),
-                          trailing:
-                              const Icon(Icons.event_seat),
+                          title: Text('$time - $hall'), // ✅ 这里只放字符串
+                          trailing: const Icon(Icons.event_seat),
                           onTap: () {
                             Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => SeatPage(
-                                    hallType: showing.hallType, // ⭐ 从数据拿
-                                    isMember: isMember,         // ⭐ 直接用变量
-                                  ),
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SeatPage(
+                                  hallType: hall,   // ✅ 用 hall
+                                  isMember: widget.isMember,
                                 ),
-                              );
+                              ),
+                            );
                           },
                         ),
                       );
