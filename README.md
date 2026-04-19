@@ -21,13 +21,8 @@ cd cinema_backend
 ./mvnw spring-boot:run
 
 Server runs on:
-http://localhost:8080
 
-## Run Flutter
-
-cd cinema_system  
-flutter pub get  
-flutter run
+https://specical-cinema-system.netlify.app/
 
 ## Database
 
