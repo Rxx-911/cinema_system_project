@@ -39,25 +39,29 @@ class _MovieListPageState extends State<MovieListPage> {
   }
 
   // ⭐ 新增：获取后端数据
-  Future<void> fetchShowings() async {
-    try {
-      final response = await http.get(
-        Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
-      );
+Future<void> fetchShowings() async {
+  try {
+    final response = await http.get(
+      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
+    );
 
-      if (response.statusCode == 200) {
-        setState(() {
-          backendShowings = json.decode(response.body);
-          loading = false;
-        });
-      } else {
+    if (response.statusCode == 200) {
+      setState(() {
+        backendShowings = json.decode(response.body);
         loading = false;
-      }
-    } catch (e) {
-      print("API error: $e");
-      loading = false;
+      });
+    } else {
+      setState(() {
+        loading = false;
+      });
     }
+  } catch (e) {
+    print("API error: $e");
+    setState(() {
+      loading = false;
+    });
   }
+}
 
   // ⭐ 原逻辑（不动）
   List<Movie> get filteredMovies {
@@ -83,13 +87,45 @@ class _MovieListPageState extends State<MovieListPage> {
         poster: "assets/posters/${(data["movie"] ?? "").toLowerCase().replaceAll(" ", "_")}.jpg",
         duration: 120,
         rating: 8.0,
-        genres: ["Action"],
+        genres: _getGenreByMovie(data["movie"]),
       );
       }).toList();
     } else {
       return filteredMovies; // fallback
     }
+    
   }
+  List<String> _getGenreByMovie(String? name) {
+  final n = name?.toLowerCase() ?? "";
+
+  if (n.contains("inception") || n.contains("interstellar")) {
+    return ["Sci-Fi"];
+  } else if (n.contains("dune")) {
+    return ["Sci-Fi", "Adventure"];
+  } else if (n.contains("zootopia")) {
+    return ["Animation", "Family"];
+  } else if (n.contains("harry")) {
+    return ["Fantasy"];
+  } else if (n.contains("forrest")) {
+    return ["Drama"];
+  } else if (n.contains("avenger")) {
+    return ["Action", "Superhero"];
+  } else {
+    return ["Action"];
+  }
+}
+
+List<Movie> get filteredDisplayMovies {
+  return displayMovies.where((movie) {
+    final matchesSearch =
+        movie.title.toLowerCase().contains(searchQuery.toLowerCase());
+
+    final matchesGenre =
+        selectedGenre == 'All' || movie.genres.contains(selectedGenre);
+
+    return matchesSearch && matchesGenre;
+  }).toList();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +142,7 @@ class _MovieListPageState extends State<MovieListPage> {
 
                     // ⭐ Banner 改为用 displayMovies（不破坏你UI）
                     FeaturedBanner(
-                      movies: displayMovies
+                      movies: filteredDisplayMovies
                           .where((movie) =>
                               movie.title != "Avatar" &&
                               movie.title != "Interstellar")
@@ -160,36 +196,76 @@ class _MovieListPageState extends State<MovieListPage> {
     );
   }
 
-  // ⭐ 不动
-  Widget _searchSection() {
-    final genres = ['All', ...movies.expand((m) => m.genres).toSet()];
+Widget _searchSection() {
+  final genres = ['All', ...displayMovies.expand((m) => m.genres).toSet()];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            onChanged: (value) {
-              setState(() {
-                searchQuery = value;
-              });
-            },
-            decoration: InputDecoration(
-              hintText: 'Search movies...',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide.none,
-              ),
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+
+        /// 🔍 搜索框
+        TextField(
+          onChanged: (value) {
+            setState(() {
+              searchQuery = value;
+            });
+          },
+          decoration: InputDecoration(
+            hintText: 'Search movies...',
+            prefixIcon: const Icon(Icons.search),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.08),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        const SizedBox(height: 12),
+
+        /// ⭐ 分类
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: genres.map((genre) {
+              final isSelected = genre == selectedGenre;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    selectedGenre = genre;
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF6C63FF)
+                        : Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    genre,
+                    style: TextStyle(
+                      color:
+                          isSelected ? Colors.white : Colors.white70,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _sectionTitle(String title) {
     return Padding(
@@ -206,22 +282,22 @@ class _MovieListPageState extends State<MovieListPage> {
   }
 
   // ⭐ 关键改动：这里换成 displayMovies
-  Widget _movieHorizontalList(BuildContext context) {
-    return SizedBox(
-      height: 300,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: displayMovies.length,
-        itemBuilder: (context, index) {
-          return _MovieCard(
-            movie: displayMovies[index],
-            isMember: widget.isMember,
-          );
-        },
-      ),
-    );
-  }
+Widget _movieHorizontalList(BuildContext context) {
+  return SizedBox(
+    height: 300,
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: filteredDisplayMovies.length,
+      itemBuilder: (context, index) {
+        return _MovieCard(
+          movie: filteredDisplayMovies[index],
+          isMember: widget.isMember,
+        );
+      },
+    ),
+  );
+}
 }
 
 //////////////////////////////////////////////////////////////

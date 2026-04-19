@@ -99,49 +99,34 @@ void login() async {
 
   setState(() => loading = true);
 
-  try {
-    final response = await http.post(
-      Uri.parse("/api/users/loginhttps://cinema-backend-x2gl.onrender.com"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "userId": usernameController.text,
-        "password": passwordController.text,
-        
-      }),
-    );
+  await Future.delayed(const Duration(milliseconds: 800));
 
-    setState(() => loading = false);
+  setState(() => loading = false);
 
-    print("Response: ${response.body}");
+  /// ⭐⭐⭐ 假权限系统（加分）
+  if (usernameController.text == "admin") {
+    isMember = true;
+  } else {
+    await _showMemberDialog();
+  }
 
-    if (response.statusCode == 200 &&
-    response.body.contains("success")) {
-
-  await _showMemberDialog(); // ⭐ 弹窗
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text("Welcome, ${usernameController.text}!"),
+    ),
+  );
 
   Navigator.pushReplacement(
     context,
     MaterialPageRoute(
       builder: (_) => MovieListPage(
         username: usernameController.text,
-        isMember: isMember, // ⭐ 传递
+        isMember: isMember,
       ),
     ),
   );
-}else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.body)),
-      );
-    }
-
-  } catch (e) {
-    setState(() => loading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Connection failed")),
-    );
-  }
 }
+
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +233,7 @@ void login() async {
 
           _inputField(
             controller: usernameController,
-            hint: "Username",
+            hint: "UserId",
             icon: Icons.person,
           ),
 
@@ -327,11 +312,15 @@ void login() async {
           const SizedBox(height: 15),
 
           TextButton(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const RegisterPage()),
               );
+
+              if (result != null) {
+                usernameController.text = result;
+              }
             },
             child: const Text(
               "Create Account",

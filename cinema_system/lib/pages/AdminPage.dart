@@ -1,6 +1,7 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'showing_manage_page.dart';
+import 'package:http/http.dart' as http;
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -9,26 +10,68 @@ class AdminPage extends StatefulWidget {
   State<AdminPage> createState() => _AdminPageState();
 }
 
-class _AdminPageState extends State<AdminPage> {
+class _AdminPageState extends State<AdminPage>
+    with SingleTickerProviderStateMixin {
+
   int selectedIndex = 0;
+
+  List movies = ["Inception", "Dune", "Zootopia"];
+  List users = [
+    {"name": "Alice", "member": true},
+    {"name": "Bob", "member": false},
+  ];
+
+  List showings = [];
+  bool loadingShowings = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchShowings();
+  }
+
+  /// 🌐 API
+  Future<void> fetchShowings() async {
+    try {
+      final res = await http.get(
+        Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
+      );
+
+      if (res.statusCode == 200) {
+        setState(() {
+          showings = json.decode(res.body);
+          loadingShowings = false;
+        });
+      }
+    } catch (e) {
+      loadingShowings = false;
+    }
+  }
 
   final menu = [
     {"title": "Dashboard", "icon": Icons.dashboard},
     {"title": "Movies", "icon": Icons.movie},
     {"title": "Showings", "icon": Icons.schedule},
-    {"title": "Pricing", "icon": Icons.attach_money},
-    {"title": "Orders", "icon": Icons.receipt_long},
     {"title": "Users", "icon": Icons.people},
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: selectedIndex == 2
+          ? FloatingActionButton(
+              backgroundColor: const Color(0xFF6C63FF),
+              onPressed: _addShowingDialog,
+              child: const Icon(Icons.add),
+            )
+          : null,
+
       body: Stack(
         children: [
 
-          /// 🌌 背景渐变
-          Container(
+          /// 🌌 背景
+          AnimatedContainer(
+            duration: const Duration(seconds: 5),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -36,42 +79,25 @@ class _AdminPageState extends State<AdminPage> {
                   Color(0xFF1A1A2E),
                   Color(0xFF16213E),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
             ),
           ),
 
-          /// 💜 背景光晕
-          Positioned(
-            top: -120,
-            left: -120,
-            child: _glow(300),
-          ),
-          Positioned(
-            bottom: -150,
-            right: -100,
-            child: _glow(350),
-          ),
+          /// 💜 光晕
+          Positioned(top: -120, left: -120, child: _glow(300)),
+          Positioned(bottom: -150, right: -100, child: _glow(350)),
 
           Row(
             children: [
-
-              /// 🧭 左侧导航栏
               _sidebar(),
-
-              /// 📊 右侧内容
-              Expanded(
-                child: _content(),
-              ),
+              Expanded(child: _content()),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 
-  /// 💜 光晕
   Widget _glow(double size) {
     return Container(
       width: size,
@@ -83,7 +109,7 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  /// 🧭 Sidebar
+  /// Sidebar
   Widget _sidebar() {
     return Container(
       width: 220,
@@ -91,48 +117,24 @@ class _AdminPageState extends State<AdminPage> {
       child: Column(
         children: [
 
-          /// 标题
-          const Text(
-            "ADMIN",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            ),
-          ),
+          const Text("ADMIN",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold)),
 
           const SizedBox(height: 40),
 
-          /// 菜单
           ...List.generate(menu.length, (index) {
-            final item = menu[index];
             final selected = index == selectedIndex;
 
             return GestureDetector(
-              onTap: () {
-                final title = item["title"];
-
-                if (title == "Showings") {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ShowingManagePage(),
-                    ),
-                  );
-                  return;
-                }
-
-                setState(() {
-                  selectedIndex = index;
-                });
-              },
+              onTap: () => setState(() => selectedIndex = index),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
+                curve: Curves.easeInOut,
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   gradient: selected
@@ -140,24 +142,16 @@ class _AdminPageState extends State<AdminPage> {
                           colors: [
                             Color(0xFF6C63FF),
                             Color(0xFF9A8CFF)
-                          ],
-                        )
+                          ])
                       : null,
                 ),
                 child: Row(
                   children: [
-                    Icon(item["icon"] as IconData,
-                        color: Colors.white70),
+                    Icon(menu[index]["icon"] as IconData,
+                        color: Colors.white),
                     const SizedBox(width: 10),
-                    Text(
-                      item["title"] as String,
-                      style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : Colors.white70,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    )
+                    Text(menu[index]["title"] as String,
+                        style: const TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
@@ -166,106 +160,337 @@ class _AdminPageState extends State<AdminPage> {
 
           const Spacer(),
 
-          /// 登出按钮
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                minimumSize: const Size(double.infinity, 45),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text("Logout"),
-            ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Logout"),
           )
         ],
       ),
     );
   }
 
-  /// 📊 右侧内容区
   Widget _content() {
+    switch (selectedIndex) {
+      case 0:
+        return _dashboard();
+      case 1:
+        return _movies();
+      case 2:
+        return _showings();
+      case 3:
+        return _users();
+      default:
+        return _dashboard();
+    }
+  }
+
+  /// Dashboard
+  Widget _dashboard() {
+    return _wrapper(
+      "Dashboard",
+      GridView.count(
+        crossAxisCount: 4,
+        children: [
+          _card("Users", users.length.toString(), Icons.people),
+          _card("Movies", movies.length.toString(), Icons.movie),
+          _card("Showings", showings.length.toString(), Icons.schedule),
+          _card("Revenue", "\$1200", Icons.attach_money),
+        ],
+      ),
+    );
+  }
+
+  /// Movies
+  Widget _movies() {
+    return _wrapper(
+      "Movies",
+      ListView.builder(
+        itemCount: movies.length,
+        itemBuilder: (_, i) {
+          return Card(
+            color: Colors.white10,
+            child: ListTile(
+              title: Text(movies[i],
+                  style: const TextStyle(color: Colors.white)),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () =>
+                    setState(() => movies.removeAt(i)),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// ⭐ Showings（终极UI）
+  Widget _showings() {
+    if (loadingShowings) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return _wrapper(
+      "Showings",
+      ListView.builder(
+        itemCount: showings.length,
+        itemBuilder: (_, i) {
+          final s = showings[i];
+
+          return TweenAnimationBuilder(
+            duration: Duration(milliseconds: 300 + i * 100),
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 30 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.all(10),
+
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.2)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.4),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+
+                  child: ListTile(
+                    leading: const Icon(Icons.movie,
+                        color: Colors.white),
+
+                    title: Text(
+                      s["movie"] ?? "",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    subtitle: Text(
+                      "Time: ${s["time"]}",
+                      style:
+                          const TextStyle(color: Colors.white70),
+                    ),
+
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit,
+                              color: Colors.blueAccent),
+                          onPressed: () => _editShowingDialog(i),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete,
+                              color: Colors.redAccent),
+                          onPressed: () => _confirmDelete(i),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Users
+  Widget _users() {
+    return _wrapper(
+      "Users",
+      ListView.builder(
+        itemCount: users.length,
+        itemBuilder: (_, i) {
+          return Card(
+            color: Colors.white10,
+            child: ListTile(
+              title: Text(users[i]["name"],
+                  style: const TextStyle(color: Colors.white)),
+              trailing: Switch(
+                value: users[i]["member"],
+                onChanged: (v) =>
+                    setState(() => users[i]["member"] = v),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _wrapper(String title, Widget child) {
     return Padding(
       padding: const EdgeInsets.all(30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          /// 标题
-          Text(
-            menu[selectedIndex]["title"] as String,
-            style: const TextStyle(
-              fontSize: 28,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 28,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
 
-          /// 内容区
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 4, 
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.3, 
-              children: [
-                _glassCard("Total Users", "128", Icons.people),
-                _glassCard("Movies", "8", Icons.movie),
-                _glassCard("Orders", "52", Icons.receipt),
-                _glassCard("Revenue", "\$1200", Icons.attach_money),
-              ],
+  Widget _card(String t, String v, IconData icon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: Colors.white.withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white),
+              const Spacer(),
+              Text(v,
+                  style: const TextStyle(
+                      fontSize: 24,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
+              Text(t,
+                  style: const TextStyle(color: Colors.white70)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 删除
+  void _confirmDelete(int i) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: const Text("Delete this showing?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                showings.removeAt(i);
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 编辑
+  void _editShowingDialog(int index) {
+    String movie = showings[index]["movie"];
+    String time = showings[index]["time"];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Edit Showing"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: TextEditingController(text: movie),
+              onChanged: (v) => movie = v,
             ),
+            TextField(
+              controller: TextEditingController(text: time),
+              onChanged: (v) => time = v,
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                showings[index] = {
+                  "movie": movie,
+                  "time": time
+                };
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Save"),
           )
         ],
       ),
     );
   }
 
-  /// 🧊 毛玻璃卡片
-  Widget _glassCard(String title, String value, IconData icon) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-              ),
+  /// 添加
+  void _addShowingDialog() {
+    String movie = "";
+    String time = "";
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Add Showing"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration:
+                  const InputDecoration(labelText: "Movie"),
+              onChanged: (v) => movie = v,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: Colors.white70, size: 30),
-                const Spacer(),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                  ),
-                )
-              ],
+            TextField(
+              decoration:
+                  const InputDecoration(labelText: "Time"),
+              onChanged: (v) => time = v,
             ),
-          ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                showings.add({"movie": movie, "time": time});
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Add"),
+          )
+        ],
       ),
     );
   }

@@ -26,22 +26,19 @@ public class UserController {
         return repo.save(user);
     }
 
-    // ⭐⭐⭐ 登录接口（关键修复）
-    @PostMapping("/login")
-    public String login(@RequestBody UserEntity user) {
+   @PostMapping("/login")
+        public String login(@RequestBody UserEntity user) {
 
-        System.out.println("Login try: " + user.getUserId());
+            UserEntity dbUser = repo.findByUserId(user.getUserId());
 
-        UserEntity found = repo.findByUserId(user.getUserId());
-
-        if (found != null) {
-            System.out.println("DB user: " + found.getUserId());
-
-            if (found.getPassword().equals(user.getPassword())) {
-                return "success";
+            if (dbUser == null) {
+                return "User not found";
             }
-        }
 
-        return "Invalid username or password";
+            if (!dbUser.getPassword().equals(user.getPassword())) {
+                return "Invalid username or password";
+            }
+
+            return "Login success";
+        }
     }
-}

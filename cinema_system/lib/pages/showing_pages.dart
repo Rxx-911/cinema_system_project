@@ -39,9 +39,10 @@ class _ShowingPageState extends State<ShowingPage> {
         final data = json.decode(response.body);
 
         setState(() {
-          backendShowings = data
-              .where((s) => s["movie"] == widget.movieTitle)
-              .toList();
+          backendShowings = data.where((s) {
+          return s["movie"].toString().toLowerCase().trim() ==
+                widget.movieTitle.toLowerCase().trim();
+        }).toList();
           loading = false;
         });
       } else {
@@ -216,36 +217,44 @@ class _ShowingPageState extends State<ShowingPage> {
                   delegate:
                       SliverChildBuilderDelegate(
                     (context, index) {
-                      final dataList =
-                          backendShowings.isNotEmpty ? backendShowings : showings;
 
-                      final showing = dataList[index];
+                // ✅ 先判断 loading
+                if (loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                      // ✅ 先定义变量
-                      final time = showing["time"] ?? showing.time;
-                      final hall = showing["hall"] ?? showing.hallType;
+                // ✅ 再定义 dataList
+                final dataList =
+                    backendShowings.isNotEmpty ? backendShowings : showings;
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          title: Text('$time - $hall'), // ✅ 这里只放字符串
-                          trailing: const Icon(Icons.event_seat),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SeatPage(
-                                  hallType: hall,   // ✅ 用 hall
-                                  isMember: widget.isMember,
-                                ),
-                              ),
-                            );
-                          },
+                final showing = dataList[index];
+
+                final time = showing.time ?? showing.time;
+                final hall = showing.hallType ?? showing.hallType;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    title: Text('$time - $hall'),
+                    trailing: const Icon(Icons.event_seat),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SeatPage(
+                            hallType: hall,
+                            isMember: widget.isMember,
+                          ),
                         ),
                       );
                     },
-                    childCount:
-                        showings.length,
+                  ),
+                );
+              },
+                    childCount: (backendShowings.isNotEmpty
+                  ? backendShowings
+                  : showings)
+              .length,
                   ),
                 ),
               ),

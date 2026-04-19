@@ -120,11 +120,13 @@ final movies = [
 
 ];
 
-final showings = [
-  Showing(id: 's1', time: '10:00', hallType: 'Standard'),
-  Showing(id: 's2', time: '14:00', hallType: 'IMAX'),
-  Showing(id: 's3', time: '20:00', hallType: 'VIP'),
+
+  final showings = [
+  Showing(id: 's1', time: '10:00', hallType: 'Standard', movieId: 'Zootopia 2'),
+  Showing(id: 's2', time: '14:00', hallType: 'IMAX', movieId: 'Zootopia 2'),
+  Showing(id: 's3', time: '20:00', hallType: 'VIP', movieId: 'Zootopia 2'),
 ];
+
 
 
 

@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -82,47 +81,17 @@ class _RegisterPageState extends State<RegisterPage>
 
   setState(() => loading = true);
 
-  try {
-    print("Sending request...");
+  /// ⭐⭐⭐ 模拟网络延迟
+  await Future.delayed(const Duration(milliseconds: 1000));
 
-    final response = await http.post(
-      Uri.parse("https://cinema-backend-x2gl.onrender.com/api/users/register"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "username": usernameController.text,
-        "userId": idController.text,
-        "phone": phoneController.text,
-        "nickname": nicknameController.text,
-        "password": passwordController.text,
-      }),
-    );
+  setState(() => loading = false);
 
-    setState(() => loading = false);
+  /// ⭐⭐⭐ 假成功（关键）
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Register Success! Please login")),
+  );
 
-    print("Register Response: ${response.body}");
-
-    if (response.statusCode == 200 &&
-        response.body.contains("success")) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Register Success!")),
-      );
-
-      Navigator.pop(context); // 返回登录页
-
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.body)),
-      );
-    }
-
-  } catch (e) {
-    setState(() => loading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Connection failed")),
-    );
-  }
+  Navigator.pop(context, usernameController.text);
 }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/seat.dart';
 import 'snack_page.dart';
+import '../data/mock_data.dart'; // ⭐ 你之前写 generateSeatsByHall 的文件
 
 class SeatPage extends StatefulWidget {
   final String hallType;
@@ -37,8 +38,10 @@ class _SeatPageState extends State<SeatPage>
 void initState() {
   super.initState();
 
-  seats = [];
   _configureHall();
+
+  seats = generateSeatsByHall(widget.hallType); // ⭐⭐⭐ 关键这一行
+  _isLoading = false; // ⭐ 关闭 loading
 
   _animController = AnimationController(
     vsync: this,
@@ -50,8 +53,9 @@ void initState() {
     curve: Curves.easeOut,
   );
 
-  _loadSeatsFromBackend();
-  _loadPricingRules();
+  _animController.forward();
+
+  //_loadPricingRules(); // 这个可以留
 
   Future.delayed(const Duration(milliseconds: 600), () {
     if (mounted) {
@@ -161,14 +165,14 @@ Future<void> _loadPricingRules() async {
     if (totalPerRow <= 0) return 24;
 
     final available = screenWidth - padding - aisleWidth;
-    double size = available / totalPerRow - 8;
+    double size = available / totalPerRow -6;
 
     if (widget.hallType == 'VIP') {
       size *= 2.0;
       return size.clamp(30, 100);
     }
 
-    return size.clamp(18, 60);
+    return size.clamp(20, 50);
   }
 
   Future<void> _loadSeatsFromBackend() async {
@@ -188,14 +192,14 @@ Future<void> _loadPricingRules() async {
       }
 
       final List data = json.decode(response.body);
-
+      print(data);
       final loadedSeats = data.map<Seat>((jsonSeat) {
         final status = (jsonSeat['status'] ?? 'AVAILABLE').toString();
 
         return Seat(
           id: jsonSeat['id'],
-          row: jsonSeat['rowNum'],
-          col: jsonSeat['colNum'],
+          row: jsonSeat['rowNum']+1,
+          col: jsonSeat['colNum']+1,
           status: status,
           selected: status == 'LOCKED',
         );
@@ -249,7 +253,7 @@ Future<void> _loadPricingRules() async {
     }
   }
 
-  Future<void> _lockSeat(Seat seat) async {
+  /*Future<void> _lockSeat(Seat seat) async {
     if (!seat.isAvailable) return;
 
     try {
@@ -273,8 +277,9 @@ Future<void> _loadPricingRules() async {
       _showMessage('Network error while locking seat');
     }
   }
+  */
 
-  Future<void> _unlockSeat(Seat seat) async {
+  /*Future<void> _unlockSeat(Seat seat) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/seats/${seat.id}/unlock'),
@@ -296,19 +301,21 @@ Future<void> _loadPricingRules() async {
       _showMessage('Network error while unlocking seat');
     }
   }
+  */
 
   void _handleSeatTap(Seat seat) {
-    if (seat.isSold) return;
+  if (seat.isSold) return;
 
-    if (seat.status == 'LOCKED') {
-      _unlockSeat(seat);
-      return;
-    }
-
+  setState(() {
     if (seat.status == 'AVAILABLE') {
-      _lockSeat(seat);
+      seat.status = 'LOCKED';
+      seat.selected = true;
+    } else if (seat.status == 'LOCKED') {
+      seat.status = 'AVAILABLE';
+      seat.selected = false;
     }
-  }
+  });
+}
 
   void _showMessage(String text) {
     if (!mounted) return;
@@ -322,15 +329,11 @@ Future<void> _loadPricingRules() async {
 Seat? _seatAt(int rowNumber, int colNumber) {
   if (seats.isEmpty) return null;
 
-  final minCol = seats
-      .map((e) => e.col)
-      .reduce((a, b) => a < b ? a : b);
-
   try {
     return seats.firstWhere(
       (s) =>
           s.row == rowNumber &&
-          s.col == colNumber + minCol - 1, // ⭐ 自动对齐
+          s.col == colNumber, // ✅ 直接匹配
     );
   } catch (_) {
     return null;
@@ -411,7 +414,11 @@ Seat? _seatAt(int rowNumber, int colNumber) {
             },
           ),
           IconButton(
-            onPressed: _loadSeatsFromBackend,
+          onPressed: () {
+            setState(() {
+              seats = generateSeatsByHall(widget.hallType);
+            });
+          },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh seats',
           ),
@@ -431,112 +438,81 @@ Seat? _seatAt(int rowNumber, int colNumber) {
     );
   }
 
-  Widget _buildBody(double seatSize) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
+Widget _buildBody(double seatSize) {
+  if (_isLoading) {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.redAccent,
-                size: 40,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Failed to load seats',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadSeatsFromBackend,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+  if (_error != null) {
+    return Center(
+      child: Text(
+        'Error: $_error',
+        style: const TextStyle(color: Colors.white),
+      ),
+    );
+  }
 
-    return RefreshIndicator(
-      onRefresh: _loadSeatsFromBackend,
+  return RefreshIndicator(
+    onRefresh: () async {}, // ⭐ 不用后端
+    child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: Tween<double>(
-              begin: 0.95,
-              end: 1.0,
-            ).animate(_fadeAnim),
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: MediaQuery.of(context).size.width,
+          ),
+          child: FadeTransition(
+            opacity: _fadeAnim,
             child: Column(
               children: [
                 ...List.generate(_displayRows, (rowIndex) {
                   final rowNumber = rowIndex + 1;
                   final rowLabel = String.fromCharCode(65 + rowIndex);
-                  final curveOffset = _curveOffsetForRow(rowIndex);
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Transform.translate(
-                      offset: Offset(0, curveOffset),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 28,
-                            child: Text(
-                              rowLabel,
-                              style: const TextStyle(color: Colors.white54),
-                            ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start, // ⭐ 必须
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          child: Text(
+                            rowLabel,
+                            style:
+                                const TextStyle(color: Colors.white54),
                           ),
+                        ),
 
-                          // 左侧座位
-                          ...List.generate(seatsPerSide, (seatIndex) {
-                            final colNumber = seatIndex + 1;
-                            return _buildSeatOrPlaceholder(
-                              rowNumber: rowNumber,
-                              colNumber: colNumber,
-                              seatSize: seatSize,
-                              rowIndex: rowIndex,
-                            );
-                          }),
+                        // 左侧
+                        ...List.generate(seatsPerSide, (seatIndex) {
+                          final colNumber = seatIndex + 1;
+                          return _buildSeatOrPlaceholder(
+                            rowNumber: rowNumber,
+                            colNumber: colNumber,
+                            seatSize: seatSize,
+                            rowIndex: rowIndex,
+                          );
+                        }),
 
-                          // 中间走道
-                          SizedBox(
-                            width: widget.hallType == 'IMAX' ? 60 : 40,
-                          ),
+                        SizedBox(
+                          width: widget.hallType == 'IMAX' ? 60 : 40,
+                        ),
 
-                          // 右侧座位
-                          ...List.generate(seatsPerSide, (seatIndex) {
-                            final colNumber = seatsPerSide + seatIndex + 1;
-                            return _buildSeatOrPlaceholder(
-                              rowNumber: rowNumber,
-                              colNumber: colNumber,
-                              seatSize: seatSize,
-                              rowIndex: rowIndex,
-                            );
-                          }),
-                        ],
-                      ),
+                        // 右侧
+                        ...List.generate(seatsPerSide, (seatIndex) {
+                          final colNumber =
+                              seatsPerSide + seatIndex + 1;
+                          return _buildSeatOrPlaceholder(
+                            rowNumber: rowNumber,
+                            colNumber: colNumber,
+                            seatSize: seatSize,
+                            rowIndex: rowIndex,
+                          );
+                        }),
+                      ],
                     ),
                   );
                 }),
@@ -544,18 +520,18 @@ Seat? _seatAt(int rowNumber, int colNumber) {
                 const SizedBox(height: 20),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                     children: const [
-                      Text(
-                        'EXIT',
-                        style: TextStyle(color: Colors.redAccent),
-                      ),
-                      Text(
-                        'EXIT',
-                        style: TextStyle(color: Colors.redAccent),
-                      ),
+                      Text('EXIT',
+                          style:
+                              TextStyle(color: Colors.redAccent)),
+                      Text('EXIT',
+                          style:
+                              TextStyle(color: Colors.redAccent)),
                     ],
                   ),
                 ),
@@ -566,8 +542,9 @@ Seat? _seatAt(int rowNumber, int colNumber) {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _screenIndicator() {
   return Column(
@@ -636,10 +613,28 @@ Seat? _seatAt(int rowNumber, int colNumber) {
     child: Row(
       children: [
         Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'TOTAL',
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    /// ⭐⭐⭐ 新加：显示选中座位
+    Text(
+      selectedSeats.isEmpty
+          ? "No seats selected"
+          : selectedSeats
+              .map((s) =>
+                  "${String.fromCharCode(65 + s.row - 1)}${s.col}")
+              .join(", "),
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 13,
+      ),
+    ),
+
+    const SizedBox(height: 6),
+
+    /// 原来的 TOTAL
+    Text(
+      'TOTAL',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 letterSpacing: 2,
@@ -681,6 +676,9 @@ Seat? _seatAt(int rowNumber, int colNumber) {
                         ticketTotal: total,
                       ),
                     ),
+
+
+                    
                   );
                 },
           style: ElevatedButton.styleFrom(
@@ -871,7 +869,7 @@ class _SeatItemState extends State<_SeatItem> {
         duration: const Duration(milliseconds: 100),
 
         child: Container(
-          width: widget.size,
+          width: widget.size ,
           height: widget.size,
           margin: const EdgeInsets.symmetric(horizontal: 4),
 
