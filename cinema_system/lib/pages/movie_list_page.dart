@@ -79,14 +79,17 @@ Future<void> fetchShowings() async {
   // ⭐ 新增：统一数据源（关键）
   List<Movie> get displayMovies {
   return backendShowings.map((data) {
+
+    final movieName = (data["movie"] ?? "").toString(); // ⭐ 修复核心
+
     return Movie(
-      id: data["id"] ?? 0,
-      title: data["movie"] ?? "Unknown",
-      description: data["movie"] ?? "No description",
-      poster: "assets/posters/${(data["movie"] ?? "").toLowerCase().replaceAll(" ", "_")}.jpg",
+      id: (data["id"] ?? 0).toString(),
+      title: movieName,
+      description: movieName,
+      poster: "assets/posters/${movieName.toLowerCase().replaceAll(" ", "_")}.jpg",
       duration: 120,
       rating: 8.0,
-      genres: _getGenreByMovie(data["movie"]),
+      genres: _getGenreByMovie(movieName), // ⭐ 用安全变量
     );
   }).toList();
 }

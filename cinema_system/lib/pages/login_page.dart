@@ -57,27 +57,27 @@ class _LoginPageState extends State<LoginPage>
 }
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
+  floatController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  )..repeat(reverse: true);
 
-    floatAnim = Tween(begin: -6.0, end: 6.0).animate(
-      CurvedAnimation(parent: floatController, curve: Curves.easeInOut),
-    );
+  floatAnim = Tween<double>(begin: -10, end: 10).animate(
+    CurvedAnimation(parent: floatController, curve: Curves.easeInOut),
+  );
 
-    glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+  glowController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  )..repeat(reverse: true);
 
-    glowAnim = Tween(begin: 0.3, end: 0.8).animate(
-      CurvedAnimation(parent: glowController, curve: Curves.easeInOut),
-    );
-  }
+  glowAnim = Tween<double>(begin: 0.2, end: 0.6).animate(
+    CurvedAnimation(parent: glowController, curve: Curves.easeInOut),
+  );
+}
 
   @override
   void dispose() {

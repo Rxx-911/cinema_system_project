@@ -75,20 +75,20 @@ final movies = [
   // ================= 新增电影 =================
 
   Movie(
-    id: 'zootopia2',
-    title: 'Zootopia 2',
+    id: 'zootopia',
+    title: 'Zootopia',
     rating: 8.5,
-    poster: 'assets/posters/zootopia2.jpg',
+    poster: 'assets/posters/zootopia.jpg',
     duration: 110,
     genres: ['Animation', 'Adventure', 'Comedy'],
     description:
         'Detectives Judy Hopps and Nick Wilde return to solve a new mystery in the bustling city of Zootopia.',
   ),
   Movie(
-    id: 'avengers4',
+    id: 'avengers',
     title: 'Avengers: Endgame',
     rating: 8.4,
-    poster: 'assets/posters/avengers4.jpg',
+    poster: 'assets/posters/avengers.jpg',
     duration: 181,
     genres: ['Action', 'Sci-Fi', 'Adventure'],
     description:
@@ -122,9 +122,9 @@ final movies = [
 
 
   final showings = [
-  Showing(id: 's1', time: '10:00', hallType: 'Standard', movieId: 'Zootopia 2'),
-  Showing(id: 's2', time: '14:00', hallType: 'IMAX', movieId: 'Zootopia 2'),
-  Showing(id: 's3', time: '20:00', hallType: 'VIP', movieId: 'Zootopia 2'),
+  Showing(id: 's1', time: '10:00', hallType: 'Standard', movieId: 'Zootopia'),
+  Showing(id: 's2', time: '14:00', hallType: 'IMAX', movieId: 'Zootopia'),
+  Showing(id: 's3', time: '20:00', hallType: 'VIP', movieId: 'Zootopia'),
 ];
 
 

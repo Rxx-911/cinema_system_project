@@ -20,6 +20,35 @@ class ShowingPage extends StatefulWidget {
 
 class _ShowingPageState extends State<ShowingPage> {
 
+  List<Map<String, dynamic>> _generateShowings() {
+  return [
+    {
+      "movie": widget.movieTitle,
+      "date": "2026-04-23",
+      "time": "14:00",
+      "hall": "Standard",
+      "price": 10.0,
+      "sold": 30,
+    },
+    {
+      "movie": widget.movieTitle,
+      "date": "2026-04-23",
+      "time": "18:00",
+      "hall": "IMAX",
+      "price": 18.0,
+      "sold": 80,
+    },
+    {
+      "movie": widget.movieTitle,
+      "date": "2026-04-23",
+      "time": "21:00",
+      "hall": "VIP",
+      "price": 25.0,
+      "sold": 120,
+    },
+  ];
+}
+
   List backendShowings = [];
   bool loading = true;
 
@@ -54,7 +83,10 @@ class _ShowingPageState extends State<ShowingPage> {
   }
   @override
   Widget build(BuildContext context) {
-    final movie = movies.firstWhere((m) => m.title == widget.movieTitle);
+    final movie = movies.firstWhere(
+  (m) => m.title.toLowerCase().contains(widget.movieTitle.toLowerCase()),
+  orElse: () => movies.first,
+);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1E),
@@ -210,54 +242,68 @@ class _ShowingPageState extends State<ShowingPage> {
 
               // ===== 场次列表 =====
               SliverPadding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                        24, 16, 24, 24),
-                sliver: SliverList(
-                  delegate:
-                      SliverChildBuilderDelegate(
-                    (context, index) {
+  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
 
-                // ✅ 先判断 loading
-                if (loading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+  /// ⭐ loading
+  sliver: loading
+      ? const SliverToBoxAdapter(
+          child: Center(child: CircularProgressIndicator()),
+        )
 
-                // ✅ 再定义 dataList
-                final dataList =
-                    backendShowings.isNotEmpty ? backendShowings : showings;
+    
 
-                final showing = dataList[index];
+      /// ⭐ 正常列表
+      : SliverList(
+    delegate: SliverChildBuilderDelegate(
+      (context, index) {
 
-                final time = showing.time ?? showing.time;
-                final hall = showing.hallType ?? showing.hallType;
+        final showingList = _generateShowings(); // ⭐ 核心
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text('$time - $hall'),
-                    trailing: const Icon(Icons.event_seat),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SeatPage(
-                            hallType: hall,
-                            isMember: widget.isMember,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-                    childCount: (backendShowings.isNotEmpty
-                  ? backendShowings
-                  : showings)
-              .length,
+        final showing = showingList[index];
+
+        final time = showing["time"];
+        final hall = showing["hall"];
+        final date = showing["date"];
+        final price = showing["price"];
+
+        return Card(
+          color: Colors.white10,
+          margin: const EdgeInsets.only(bottom: 12),
+
+          child: ListTile(
+            leading: const Icon(Icons.movie, color: Colors.white),
+
+            title: Text(
+              "$date  $time  ($hall)",
+              style: const TextStyle(color: Colors.white),
+            ),
+
+            subtitle: Text(
+              "£$price",
+              style: const TextStyle(color: Colors.white70),
+            ),
+
+            trailing: const Icon(Icons.event_seat, color: Colors.white),
+
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SeatPage(
+                    hallType: hall, // ⭐ 直接传 Standard / IMAX / VIP
+                    isMember: widget.isMember,
+                    showing: showing,
                   ),
                 ),
-              ),
+              );
+            },
+          ),
+        );
+      },
+      childCount: 3, // ⭐ 固定三场
+    ),
+)
+),
             ],
           ),
 

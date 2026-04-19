@@ -12,9 +12,7 @@ class ShowingManagePage extends StatefulWidget {
 
 class _ShowingManagePageState extends State<ShowingManagePage> {
 
-  /// ⭐ 从后端获取的数据
-  List<Map<String, dynamic>> showings = [];
-
+List<Map<String, dynamic>> showings = [];
   /// ⭐ 页面加载时请求数据
   @override
   void initState() {
@@ -56,16 +54,44 @@ class _ShowingManagePageState extends State<ShowingManagePage> {
 
   /// ⭐ 新增排片（调用后端）
   Future<void> _addShowing(Map data) async {
-    final response = await http.post(
+
+  final baseMovie = data["movie"];
+  final baseDate = data["date"];
+
+  final showingsToCreate = [
+    {
+      "movie": baseMovie,
+      "date": baseDate,
+      "time": "14:00",
+      "hall": "Standard",
+      "price": 10.0,
+    },
+    {
+      "movie": baseMovie,
+      "date": baseDate,
+      "time": "18:00",
+      "hall": "IMAX",
+      "price": 18.0,
+    },
+    {
+      "movie": baseMovie,
+      "date": baseDate,
+      "time": "21:00",
+      "hall": "VIP",
+      "price": 25.0,
+    },
+  ];
+
+  for (var showing in showingsToCreate) {
+    await http.post(
       Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode(data),
+      body: jsonEncode(showing),
     );
-
-    if (response.statusCode == 200) {
-      _loadShowings(); // 刷新
-    }
   }
+
+  _loadShowings(); // 刷新
+}
 
   /// ⭐ 删除排片（调用后端）
   Future<void> _deleteShowing(int id) async {
@@ -218,7 +244,6 @@ class _ShowingManagePageState extends State<ShowingManagePage> {
               const SizedBox(height: 10),
               _input(hallController, "Hall (IMAX/VIP)"),
               const SizedBox(height: 10),
-              _input(priceController, "Price"),
             ],
           ),
           actions: [

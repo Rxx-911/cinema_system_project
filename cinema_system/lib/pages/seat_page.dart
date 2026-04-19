@@ -8,11 +8,13 @@ import '../data/mock_data.dart'; // ⭐ 你之前写 generateSeatsByHall 的文�
 class SeatPage extends StatefulWidget {
   final String hallType;
   final bool isMember;
+  final Map showing;
 
   const SeatPage({
     super.key,
     required this.hallType,
     required this.isMember,
+    required this.showing,
   });
 
   @override
@@ -22,7 +24,7 @@ class SeatPage extends StatefulWidget {
 class _SeatPageState extends State<SeatPage>
     with SingleTickerProviderStateMixin {
   static const String _baseUrl = 'https://cinema-backend-x2gl.onrender.com';
-  late List<Seat> seats;
+  late List<Seat> seats = [];
   late int rows;
   late int seatsPerSide;
 
@@ -39,9 +41,9 @@ void initState() {
   super.initState();
 
   _configureHall();
-
-  seats = generateSeatsByHall(widget.hallType); // ⭐⭐⭐ 关键这一行
-  _isLoading = false; // ⭐ 关闭 loading
+  
+  seats = generateSeatsByHall(widget.hallType); // ⭐ 必须有
+  _isLoading = false;
 
   _animController = AnimationController(
     vsync: this,
@@ -219,12 +221,12 @@ Future<void> _loadPricingRules() async {
     } catch (e) {
       debugPrint('Load seats error: $e');
 
-      if (!mounted) return;
+if (!mounted) return;
 
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+setState(() {
+  seats = generateSeatsByHall(widget.hallType); // ⭐ fallback
+  _isLoading = false;
+});
     }
   }
 
@@ -396,7 +398,9 @@ Seat? _seatAt(int rowNumber, int colNumber) {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text('Select Seats (${widget.hallType})'),
+        title: Text(
+           "${widget.showing["movie"]} (${widget.hallType})",
+           ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -415,9 +419,7 @@ Seat? _seatAt(int rowNumber, int colNumber) {
           ),
           IconButton(
           onPressed: () {
-            setState(() {
-              seats = generateSeatsByHall(widget.hallType);
-            });
+            _loadSeatsFromBackend();
           },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh seats',
@@ -455,7 +457,9 @@ Widget _buildBody(double seatSize) {
   }
 
   return RefreshIndicator(
-    onRefresh: () async {}, // ⭐ 不用后端
+    onRefresh: () async {
+      await _loadSeatsFromBackend();
+    }, // ⭐ 不用后端
     child: SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: SingleChildScrollView(
@@ -589,14 +593,15 @@ Widget _buildBody(double seatSize) {
   Widget _bottomBar() {
   final selectedSeats = seats.where((s) => s.isLocked).toList();
   final selectedCount = selectedSeats.length;
-  final pricePerSeat = _priceByHall();
+  final pricePerSeat = (widget.showing["price"] ?? 15).toDouble();
   final total = calculateFinalPrice(
-      basePrice: selectedCount * pricePerSeat,
-      ticketCount: selectedCount,
-      totalSold: 120, // ⭐ 先写死，后面接后端
-      time: DateTime.now(),
-      isMember: widget.isMember, // ⭐ 后面接用户系统
-    );
+
+  basePrice: (selectedCount * pricePerSeat).toDouble(),
+  ticketCount: selectedCount,
+  totalSold: widget.showing["sold"] ?? 50, // ⭐⭐⭐ 用 showing
+  time: DateTime.now(),
+  isMember: widget.isMember,
+);
     
   return Container(
     padding: const EdgeInsets.fromLTRB(20, 16, 20, 26),
@@ -865,8 +870,8 @@ class _SeatItemState extends State<_SeatItem> {
       onTapCancel: () => setState(() => pressing = false),
 
       child: AnimatedScale(
-        scale: pressing ? 0.92 : 1,
-        duration: const Duration(milliseconds: 100),
+  scale: widget.seat.selected ? 1.15 : (pressing ? 0.92 : 1),
+  duration: const Duration(milliseconds: 120),
 
         child: Container(
           width: widget.size ,
