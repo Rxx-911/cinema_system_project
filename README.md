@@ -21,7 +21,9 @@ cd cinema_backend
 ./mvnw spring-boot:run
 
 Server runs on:
+https://cinema-backend-x2gl.onrender.com/api/showings
 
+showing ：
 https://specical-cinema-system.netlify.app/
 
 ## Database
