@@ -49,40 +49,12 @@ class _ShowingPageState extends State<ShowingPage> {
   ];
 }
 
-  List backendShowings = [];
-  bool loading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    fetchShowings();
-  }
+  
 
-  Future<void> fetchShowings() async {
-    try {
-      final response = await http.get(
-        Uri.parse("https://cinema-backend-x2gl.onrender.com/api/showings"),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        setState(() {
-          backendShowings = data.where((s) {
-          return s["movie"].toString().toLowerCase().trim() ==
-                widget.movieTitle.toLowerCase().trim();
-        }).toList();
-          loading = false;
-        });
-      } else {
-        loading = false;
-      }
-    } catch (e) {
-      loading = false;
-    }
-  }
   @override
   Widget build(BuildContext context) {
+    final showingList = _generateShowings();
     final movie = movies.firstWhere(
   (m) => m.title.toLowerCase().contains(widget.movieTitle.toLowerCase()),
   orElse: () => movies.first,
@@ -244,66 +216,61 @@ class _ShowingPageState extends State<ShowingPage> {
               SliverPadding(
   padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
 
-  /// ⭐ loading
-  sliver: loading
-      ? const SliverToBoxAdapter(
-          child: Center(child: CircularProgressIndicator()),
-        )
 
     
-
+    sliver
       /// ⭐ 正常列表
       : SliverList(
-    delegate: SliverChildBuilderDelegate(
-      (context, index) {
+  delegate: SliverChildBuilderDelegate(
+    (context, index) {
 
-        final showingList = _generateShowings(); // ⭐ 核心
+      final showing = showingList[index]; // ✅ 用外部的
 
-        final showing = showingList[index];
+      final time = showing["time"] ?? "";
+      final hall = showing["hall"] ?? "Standard";
+      final date = showing["date"] ?? "";
+      final price = showing["price"] ?? 0;
 
-        final time = showing["time"];
-        final hall = showing["hall"];
-        final date = showing["date"];
-        final price = showing["price"];
+      return Card(
+        color: Colors.white10,
+        margin: const EdgeInsets.only(bottom: 12),
 
-        return Card(
-          color: Colors.white10,
-          margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: const Icon(Icons.movie, color: Colors.white),
 
-          child: ListTile(
-            leading: const Icon(Icons.movie, color: Colors.white),
-
-            title: Text(
-              "$date  $time  ($hall)",
-              style: const TextStyle(color: Colors.white),
-            ),
-
-            subtitle: Text(
-              "£$price",
-              style: const TextStyle(color: Colors.white70),
-            ),
-
-            trailing: const Icon(Icons.event_seat, color: Colors.white),
-
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SeatPage(
-                    hallType: hall, // ⭐ 直接传 Standard / IMAX / VIP
-                    isMember: widget.isMember,
-                    showing: showing,
-                  ),
-                ),
-              );
-            },
+          title: Text(
+            "$date  $time  ($hall)",
+            style: const TextStyle(color: Colors.white),
           ),
-        );
-      },
-      childCount: 3, // ⭐ 固定三场
+
+          subtitle: Text(
+            "£$price",
+            style: const TextStyle(color: Colors.white70),
+          ),
+
+          trailing: const Icon(Icons.event_seat, color: Colors.white),
+
+          onTap: () {
+            print("👉 tap showing: $showing"); // ⭐ 调试用
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SeatPage(
+                  hallType: hall,
+                  isMember: widget.isMember,
+                  showing: showing,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    },
+    childCount: showingList.length, // ✅ 不要写死 3
+  ),
+) // ⭐ 固定三场
     ),
-)
-),
             ],
           ),
 
