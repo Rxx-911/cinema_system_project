@@ -78,23 +78,19 @@ Future<void> fetchShowings() async {
 
   // ⭐ 新增：统一数据源（关键）
   List<Movie> get displayMovies {
-    if (backendShowings.isNotEmpty) {
-      return backendShowings.map((data) {
-        return Movie(
-        id: data["id"] ?? 0,
-        title: data["movie"] ?? "Unknown",
-        description: data["movie"] ?? "No description",
-        poster: "assets/posters/${(data["movie"] ?? "").toLowerCase().replaceAll(" ", "_")}.jpg",
-        duration: 120,
-        rating: 8.0,
-        genres: _getGenreByMovie(data["movie"]),
-      );
-      }).toList();
-    } else {
-      return filteredMovies; // fallback
-    }
-    
-  }
+  return backendShowings.map((data) {
+    return Movie(
+      id: data["id"] ?? 0,
+      title: data["movie"] ?? "Unknown",
+      description: data["movie"] ?? "No description",
+      poster: "assets/posters/${(data["movie"] ?? "").toLowerCase().replaceAll(" ", "_")}.jpg",
+      duration: 120,
+      rating: 8.0,
+      genres: _getGenreByMovie(data["movie"]),
+    );
+  }).toList();
+}
+
   List<String> _getGenreByMovie(String? name) {
   final n = name?.toLowerCase() ?? "";
 
